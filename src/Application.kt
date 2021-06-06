@@ -64,8 +64,6 @@ fun Application.module(testing: Boolean = false) {
                     Countries.insert {
                         it[Countries.countryCode] = country.countryCode
                         it[Countries.fullName] = country.fullName
-                        it[Countries.fromYear] = country.fromDate.year
-                        it[Countries.toYear] = country.toDate.year
                     }
                 }
             }
