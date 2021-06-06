@@ -31,15 +31,16 @@ fun Application.module(testing: Boolean = false) {
         gson()
     }
 
-    Database.connect("jdbc:h2:mem:test;DB_CLOSE_DELAY=-1", driver = "org.h2.Driver")
+    /*"jdbc:h2:mem:test;DB_CLOSE_DELAY=-1", driver = "org.h2.Driver"*/
+    Database.connect(
+        url = "jdbc:mysql://127.0.0.1:3306/sys?autoReconnect=true&useSSL=false",
+        driver = "com.mysql.cj.jdbc.Driver",
+        user = "root",
+        password = "password"
+    )
     transaction {
         SchemaUtils.create(Countries)
         SchemaUtils.create(Holidays)
-
-//        Countries.insert {
-//            it[Countries.countryCode] = "pk"
-//            it[Countries.fullName] = "Pakistan"
-//        }
     }
 
     async {
@@ -69,29 +70,7 @@ fun Application.module(testing: Boolean = false) {
             }
         }
 
-
-//        val holidays =
-//            client.request<List<Holiday>>("https://kayaposoft.com/enrico/json/v2.0/?action=getHolidaysForYear&year=2022&country=est&holidayType=public_holiday")
-//
-//        for (holiday in holidays) {
-//            transaction {
-//                Holidays.insert {
-//                    it[Holidays.date] = holiday.date.day
-//                    it[Holidays.month] = holiday.date.month
-//                    it[Holidays.year] = holiday.date.year
-//                    it[Holidays.dayOfWeek] = holiday.date.dayOfWeek
-//                    it[Holidays.name] = holiday.name[holiday.name.size-1].text
-//                    it[Holidays.country]="est"//update
-//                }
-//            }
-//        }
-
     }
-//    val db = DatabaseFactory.create()
-//    Database.connect(db)
-//    install(FlywayFeature) {
-//        dataSource = db
-//    }
 
     routing {
         root()

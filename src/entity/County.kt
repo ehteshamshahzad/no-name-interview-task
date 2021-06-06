@@ -27,31 +27,7 @@ data class CountryResponse(
 @Serializable
 data class Country(
     val countryCode: String,
-//    val regions: List<String>,
-//    val holidayTypes: List<String>,
     val fullName: String,
     val fromDate: Date,
     val toDate: Date
 )
-
-@Serializable
-enum class HolidayType(val value: String) {
-    ExtraWorkingDay("extra_working_day"),
-    Observance("observance"),
-    OtherDay("other_day"),
-    PostalHoliday("postal_holiday"),
-    PublicHoliday("public_holiday"),
-    SchoolHoliday("school_holiday");
-
-    companion object {
-        public fun fromValue(value: String): HolidayType = when (value) {
-            "extra_working_day" -> ExtraWorkingDay
-            "observance" -> Observance
-            "other_day" -> OtherDay
-            "postal_holiday" -> PostalHoliday
-            "public_holiday" -> PublicHoliday
-            "school_holiday" -> SchoolHoliday
-            else -> throw IllegalArgumentException()
-        }
-    }
-}
