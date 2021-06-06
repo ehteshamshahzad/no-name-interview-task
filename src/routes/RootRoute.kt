@@ -29,12 +29,9 @@ fun Routing.root() {
         }
 
         if (countryHolidays.isNotEmpty()) {
-
             call.respond(groupByMonth(countryHolidays))
 
-
         } else {
-
             val client = HttpClient(Apache) {
                 install(JsonFeature) {
                     serializer = GsonSerializer()
@@ -81,6 +78,88 @@ fun Routing.root() {
             Countries.select { Countries.countryCode eq countryCode }.map { Countries.toCountry(it) }
         }
         call.respond(country)
+    }
+
+    get("/streak/{code}/{year}") {
+        val countryCode = call.parameters["code"].toString()
+        val year = call.parameters["year"]
+
+        val client = HttpClient(Apache) {
+            install(JsonFeature) {
+                serializer = GsonSerializer()
+            }
+        }
+
+        val holidays =
+            client.request<List<Holiday>>(
+                "https://kayaposoft.com/enrico/json/v2.0/?action=getHolidaysForYear&" +
+                        "year=$year&country=$countryCode&holidayType=public_holiday"
+            )
+
+        var maxHolidays = 2
+        val maxNum = mutableListOf<Int>()
+        maxNum.add(maxHolidays)
+
+        var index = 0
+        var placeHolder = 2
+        var oppositePlaceHolder = 4
+
+        while (index != holidays.size) {
+            if (holidays[index].date.dayOfWeek.toInt() == 1) {
+                maxHolidays = 3
+                var temp = index + 1
+                while (temp < holidays.size) {
+                    if (holidays[temp].date.dayOfWeek.toInt() == placeHolder &&
+                        holidays[temp - 1].date.month == holidays[temp].date.month
+                    ) {
+                        placeHolder++
+                        temp++
+                        maxHolidays++
+                    } else break
+                }
+                maxNum.add(maxHolidays)
+            }
+            index++
+        }
+
+
+        index = 0
+        while (index != holidays.size) {
+            if (holidays[index].date.dayOfWeek.toInt() == 5) {
+                maxHolidays = 3
+                var temp = index - 1
+                while (temp > 0) {
+                    if (holidays[temp].date.dayOfWeek.toInt() == oppositePlaceHolder
+                        && holidays[temp + 1].date.month == holidays[temp].date.month
+                    ) {
+                        oppositePlaceHolder--
+                        temp--
+                        maxHolidays++
+                    } else break
+                }
+                maxNum.add(maxHolidays)
+            }
+            index++
+        }
+
+        var newMax = 0
+        index = 0
+        while (index < holidays.size) {
+            if (index + 1 != holidays.size) {
+                if (holidays[index].date.day + 1 == holidays[index + 1].date.day &&
+                    holidays[index].date.month == holidays[index + 1].date.month
+                ) {
+                    newMax++
+                } else if (newMax > 0) {
+                    maxNum.add(newMax)
+                    newMax = 0
+                }
+            }
+            index++
+        }
+
+        // Missing case: If one holiday is on Friday, and other one is on the following Monday. So Friday, Saturday, Sunday, Monday.
+        call.respond(Streak(maxNum.maxOrNull()!!.toInt()))
     }
 }
 
