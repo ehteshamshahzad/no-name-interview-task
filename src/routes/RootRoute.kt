@@ -1,9 +1,6 @@
 package com.ehtesham.routes
 
-import com.ehtesham.entity.Countries
-import com.ehtesham.entity.Country
-import com.ehtesham.entity.Holiday
-import com.ehtesham.entity.Holidays
+import com.ehtesham.entity.*
 import io.ktor.application.*
 import io.ktor.client.*
 import io.ktor.client.engine.apache.*
@@ -24,46 +21,51 @@ fun Routing.root() {
 
     get("/holidays/{code}/{year}") {
         val countryCode = call.parameters["code"].toString()
-        val year = call.parameters["year"].toString()
+        val year = call.parameters["year"]
 
         val countryHolidays = transaction {
-            Holidays.select { Holidays.country eq countryCode and (Holidays.year eq year.toLong()) }
+            Holidays.select { (Holidays.country eq countryCode) and (Holidays.year eq year!!.toLong()) }
                 .map { Holidays.toHoliday(it) }
         }
 
         if (countryHolidays.isNotEmpty()) {
-            call.respond(countryHolidays)
-        }
 
-        val client = HttpClient(Apache) {
-            install(JsonFeature) {
-                serializer = GsonSerializer()
-            }
-        }
+            call.respond(groupByMonth(countryHolidays))
 
-        val holidays =
-            client.request<List<Holiday>>(
-                "https://kayaposoft.com/enrico/json/v2.0/?action=getHolidaysForYear&" +
-                        "year=$year&country=$countryCode&holidayType=public_holiday"
-            )
 
-        for (holiday in holidays) {
-            transaction {
-                Holidays.insert {
-                    it[Holidays.date] = holiday.date.day
-                    it[Holidays.month] = holiday.date.month
-                    it[Holidays.year] = holiday.date.year
-                    it[Holidays.dayOfWeek] = holiday.date.dayOfWeek
-                    it[Holidays.name] = holiday.name[holiday.name.size - 1].text
-                    it[Holidays.country] = "est"//update
+        } else {
+
+            val client = HttpClient(Apache) {
+                install(JsonFeature) {
+                    serializer = GsonSerializer()
                 }
             }
-        }
 
-        val holidayResponse = transaction {
-            Holidays.selectAll().map { Holidays.toHoliday(it) }
+            val holidays =
+                client.request<List<Holiday>>(
+                    "https://kayaposoft.com/enrico/json/v2.0/?action=getHolidaysForYear&" +
+                            "year=$year&country=$countryCode&holidayType=public_holiday"
+                )
+
+            for (holiday in holidays) {
+                transaction {
+                    Holidays.insert {
+                        it[Holidays.date] = holiday.date.day
+                        it[Holidays.month] = holiday.date.month
+                        it[Holidays.year] = holiday.date.year
+                        it[Holidays.dayOfWeek] = holiday.date.dayOfWeek
+                        it[Holidays.name] = holiday.name[holiday.name.size - 1].text
+                        it[Holidays.country] = countryCode//update
+                    }
+                }
+            }
+
+            val holidayResponse = transaction {
+                Holidays.select { (Holidays.country eq countryCode) and (Holidays.year eq year!!.toLong()) }
+                    .map { Holidays.toHoliday(it) }
+            }
+            call.respond(groupByMonth(holidayResponse))
         }
-        call.respond(holidayResponse)
     }
 
     get("/countries") {
@@ -80,4 +82,29 @@ fun Routing.root() {
         }
         call.respond(country)
     }
+}
+
+fun groupByMonth(countryHolidays: List<HolidayResponse>): List<Month> {
+    var i: Long
+    val list: MutableList<Month> = mutableListOf()
+    var monthName: String
+    var data: MutableList<Data> = mutableListOf()
+
+    i = countryHolidays[0].month
+    monthName = getMonthByCode(i.toInt()).toString()
+
+    for (holiday in countryHolidays) {
+        if (i == holiday.month) {
+            data.add(Data(holiday.date, holiday.dayOfWeek, holiday.name))
+
+        } else {
+            list.add(Month(monthName, data))
+            data = mutableListOf()
+            i = holiday.month
+            monthName = getMonthByCode(i.toInt()).toString()
+            data.add(Data(holiday.date, holiday.dayOfWeek, holiday.name))
+        }
+    }
+    list.add(Month(monthName, data))
+    return list
 }
