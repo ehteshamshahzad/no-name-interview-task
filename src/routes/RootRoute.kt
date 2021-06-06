@@ -1,10 +1,9 @@
 package com.ehtesham.routes
 
+import com.ehtesham.entity.Countries
 import com.ehtesham.entity.Country
-import com.ehtesham.repository.CountryRepository
-import com.ehtesham.repository.InMemoryCountryRepository
-import com.ehtesham.repository.MySQLCountryRepository
-import com.ehtesham.repository.countryStorage
+import com.ehtesham.entity.Holiday
+import com.ehtesham.entity.Holidays
 import io.ktor.application.*
 import io.ktor.client.*
 import io.ktor.client.engine.apache.*
@@ -12,45 +11,73 @@ import io.ktor.client.features.json.*
 import io.ktor.client.request.*
 import io.ktor.response.*
 import io.ktor.routing.*
+import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.insert
+import org.jetbrains.exposed.sql.select
+import org.jetbrains.exposed.sql.selectAll
+import org.jetbrains.exposed.sql.transactions.transaction
 
 fun Routing.root() {
 
-    val repository: CountryRepository = InMemoryCountryRepository()
-
-    val client = HttpClient(Apache) {
-        install(JsonFeature) {
-            serializer = GsonSerializer()
-        }
+    get("/") {
     }
 
-//    get("/") {
-//        if (countryStorage.isEmpty()) {
-//            countryStorage =
-//                client.request<List<Country>>("https://kayaposoft.com/enrico/json/v2.0/?action=getSupportedCountries")
-//                    .toMutableList()
-//        }
-//        call.respond(countryStorage)
-////        call.respondText("Hi!")
-//    }
+    get("/holidays/{code}/{year}") {
+        val countryCode = call.parameters["code"].toString()
+        val year = call.parameters["year"].toString()
 
-    get("/") {
-        if (repository.getAllCountries().isEmpty()) {
-            repository.saveCountries(client.request<List<Country>>("https://kayaposoft.com/enrico/json/v2.0/?action=getSupportedCountries"))
+        val countryHolidays = transaction {
+            Holidays.select { Holidays.country eq countryCode and (Holidays.year eq year.toLong()) }
+                .map { Holidays.toHoliday(it) }
         }
-//        if(countryStorage.isEmpty()){
-//            countryStorage = client.request<MutableList<Country>>("https://kayaposoft.com/enrico/json/v2.0/?action=getSupportedCountries")
-//        }
-        call.respond(repository.getAllCountries())
+
+        if (countryHolidays.isNotEmpty()) {
+            call.respond(countryHolidays)
+        }
+
+        val client = HttpClient(Apache) {
+            install(JsonFeature) {
+                serializer = GsonSerializer()
+            }
+        }
+
+        val holidays =
+            client.request<List<Holiday>>(
+                "https://kayaposoft.com/enrico/json/v2.0/?action=getHolidaysForYear&" +
+                        "year=$year&country=$countryCode&holidayType=public_holiday"
+            )
+
+        for (holiday in holidays) {
+            transaction {
+                Holidays.insert {
+                    it[Holidays.date] = holiday.date.day
+                    it[Holidays.month] = holiday.date.month
+                    it[Holidays.year] = holiday.date.year
+                    it[Holidays.dayOfWeek] = holiday.date.dayOfWeek
+                    it[Holidays.name] = holiday.name[holiday.name.size - 1].text
+                    it[Holidays.country] = "est"//update
+                }
+            }
+        }
+
+        val holidayResponse = transaction {
+            Holidays.selectAll().map { Holidays.toHoliday(it) }
+        }
+        call.respond(holidayResponse)
     }
 
     get("/countries") {
-        call.respond(repository.getAllCountries())
+        val countries = transaction {
+            Countries.selectAll().map { Countries.toCountry(it) }
+        }
+        call.respond(countries)
     }
 
     get("/country/{code}") {
-        val countryCode = call.parameters["code"]
-
-        // TODO: encapsulate it with if else, to check for null. And remove !!, !!.
-        call.respond(repository.getCountry(countryCode!!)!!)
+        val countryCode = call.parameters["code"].toString()
+        val country = transaction {
+            Countries.select { Countries.countryCode eq countryCode }.map { Countries.toCountry(it) }
+        }
+        call.respond(country)
     }
 }

@@ -1,14 +1,34 @@
 package com.ehtesham.entity
 
 import kotlinx.serialization.Serializable
+import org.jetbrains.exposed.sql.Column
+import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.Table
 
-//object Countries : Table() {
-//    val countryCode = varchar("countryCode", 50)
-//    val fullName = varchar("fullName", 255)
-//    override val primaryKey = PrimaryKey(countryCode)
-//}
+object Countries : Table() {
+    val countryCode: Column<String> = varchar("countryCode", 50)
+    val fullName: Column<String> = varchar("fullName", 255)
+    val fromYear: Column<Long> = long("fromYear")
+    val toYear: Column<Long> = long("toYear")
 
+    override val primaryKey = PrimaryKey(countryCode, name = "PK_Country_Code")
+
+    fun toCountry(row: ResultRow): CountryResponse =
+        CountryResponse(
+            countryCode = row[Countries.countryCode],
+            fullName = row[Countries.fullName],
+            fromYear = row[Countries.fromYear],
+            toYear = row[Countries.toYear]
+        )
+}
+
+@Serializable
+data class CountryResponse(
+    val countryCode: String,
+    val fullName: String,
+    val fromYear: Long,
+    val toYear: Long
+)
 
 @Serializable
 data class Country(
@@ -16,15 +36,8 @@ data class Country(
 //    val regions: List<String>,
 //    val holidayTypes: List<String>,
     val fullName: String,
-//    val fromDate: Date,
-//    val toDate: Date
-)
-
-@Serializable
-data class Date(
-    val day: Long,
-    val month: Long,
-    val year: Long
+    val fromDate: Date,
+    val toDate: Date
 )
 
 @Serializable
