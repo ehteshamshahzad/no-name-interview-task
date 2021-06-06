@@ -84,82 +84,47 @@ fun Routing.root() {
         val countryCode = call.parameters["code"].toString()
         val year = call.parameters["year"]
 
-        val client = HttpClient(Apache) {
-            install(JsonFeature) {
-                serializer = GsonSerializer()
-            }
+        val countryHolidays = transaction {
+            Holidays.select { (Holidays.country eq countryCode) and (Holidays.year eq year!!.toLong()) }
+                .map { Holidays.toHoliday(it) }
         }
+        if (countryHolidays.isNotEmpty()) {
+//            calculateMaxDays(countryHolidays)
+            call.respond(Streak(calculateMaxDays(countryHolidays).maxOrNull()!!.toInt()))
 
-        val holidays =
-            client.request<List<Holiday>>(
-                "https://kayaposoft.com/enrico/json/v2.0/?action=getHolidaysForYear&" +
-                        "year=$year&country=$countryCode&holidayType=public_holiday"
-            )
-
-        var maxHolidays = 2
-        val maxNum = mutableListOf<Int>()
-        maxNum.add(maxHolidays)
-
-        var index = 0
-        var placeHolder = 2
-        var oppositePlaceHolder = 4
-
-        while (index != holidays.size) {
-            if (holidays[index].date.dayOfWeek.toInt() == 1) {
-                maxHolidays = 3
-                var temp = index + 1
-                while (temp < holidays.size) {
-                    if (holidays[temp].date.dayOfWeek.toInt() == placeHolder &&
-                        holidays[temp - 1].date.month == holidays[temp].date.month
-                    ) {
-                        placeHolder++
-                        temp++
-                        maxHolidays++
-                    } else break
-                }
-                maxNum.add(maxHolidays)
-            }
-            index++
-        }
-
-
-        index = 0
-        while (index != holidays.size) {
-            if (holidays[index].date.dayOfWeek.toInt() == 5) {
-                maxHolidays = 3
-                var temp = index - 1
-                while (temp > 0) {
-                    if (holidays[temp].date.dayOfWeek.toInt() == oppositePlaceHolder
-                        && holidays[temp + 1].date.month == holidays[temp].date.month
-                    ) {
-                        oppositePlaceHolder--
-                        temp--
-                        maxHolidays++
-                    } else break
-                }
-                maxNum.add(maxHolidays)
-            }
-            index++
-        }
-
-        var newMax = 0
-        index = 0
-        while (index < holidays.size) {
-            if (index + 1 != holidays.size) {
-                if (holidays[index].date.day + 1 == holidays[index + 1].date.day &&
-                    holidays[index].date.month == holidays[index + 1].date.month
-                ) {
-                    newMax++
-                } else if (newMax > 0) {
-                    maxNum.add(newMax)
-                    newMax = 0
+        } else {
+            val client = HttpClient(Apache) {
+                install(JsonFeature) {
+                    serializer = GsonSerializer()
                 }
             }
-            index++
-        }
 
+            val holidays =
+                client.request<List<Holiday>>(
+                    "https://kayaposoft.com/enrico/json/v2.0/?action=getHolidaysForYear&" +
+                            "year=$year&country=$countryCode&holidayType=public_holiday"
+                )
+
+            for (holiday in holidays) {
+                transaction {
+                    Holidays.insert {
+                        it[Holidays.date] = holiday.date.day
+                        it[Holidays.month] = holiday.date.month
+                        it[Holidays.year] = holiday.date.year
+                        it[Holidays.dayOfWeek] = holiday.date.dayOfWeek
+                        it[Holidays.name] = holiday.name[holiday.name.size - 1].text
+                        it[Holidays.country] = countryCode//update
+                    }
+                }
+            }
+
+            val holidayResponse = transaction {
+                Holidays.select { (Holidays.country eq countryCode) and (Holidays.year eq year!!.toLong()) }
+                    .map { Holidays.toHoliday(it) }
+            }
+            call.respond(Streak(calculateMaxDays(holidayResponse).maxOrNull()!!.toInt()))
+        }
         // Missing case: If one holiday is on Friday, and other one is on the following Monday. So Friday, Saturday, Sunday, Monday.
-        call.respond(Streak(maxNum.maxOrNull()!!.toInt()))
     }
 }
 
@@ -186,4 +151,70 @@ fun groupByMonth(countryHolidays: List<HolidayResponse>): List<Month> {
     }
     list.add(Month(monthName, data))
     return list
+}
+
+fun calculateMaxDays(holidays: List<HolidayResponse>): MutableList<Int> {
+    var maxHolidays = 2
+    val maxNum = mutableListOf<Int>()
+    maxNum.add(maxHolidays)
+
+    var index = 0
+    var placeHolder = 2
+    var oppositePlaceHolder = 4
+
+    while (index != holidays.size) {
+        if (holidays[index].dayOfWeek.toInt() == 1) {
+            maxHolidays = 3
+            var temp = index + 1
+            while (temp < holidays.size) {
+                if (holidays[temp].dayOfWeek.toInt() == placeHolder &&
+                    holidays[temp - 1].month == holidays[temp].month
+                ) {
+                    placeHolder++
+                    temp++
+                    maxHolidays++
+                } else break
+            }
+            maxNum.add(maxHolidays)
+        }
+        index++
+    }
+
+
+    index = 0
+    while (index != holidays.size) {
+        if (holidays[index].dayOfWeek.toInt() == 5) {
+            maxHolidays = 3
+            var temp = index - 1
+            while (temp > 0) {
+                if (holidays[temp].dayOfWeek.toInt() == oppositePlaceHolder
+                    && holidays[temp + 1].month == holidays[temp].month
+                ) {
+                    oppositePlaceHolder--
+                    temp--
+                    maxHolidays++
+                } else break
+            }
+            maxNum.add(maxHolidays)
+        }
+        index++
+    }
+
+    var newMax = 0
+    index = 0
+    while (index < holidays.size) {
+        if (index + 1 != holidays.size) {
+            if (holidays[index].date + 1 == holidays[index + 1].date &&
+                holidays[index].month == holidays[index + 1].month
+            ) {
+                newMax++
+            } else if (newMax > 0) {
+                maxNum.add(newMax)
+                newMax = 0
+            }
+        }
+        index++
+    }
+
+    return maxNum
 }
