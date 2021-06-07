@@ -14,6 +14,9 @@ import org.jetbrains.exposed.sql.select
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 
+/**
+ * This is our root function. Responsible for handling all calls
+ */
 fun Routing.root() {
 
     get("/") {
@@ -128,6 +131,11 @@ fun Routing.root() {
     }
 }
 
+/**
+ * We are grouping holidays by months.
+ * @param [List<HolidayResponse>)]
+ * @return [List<Month>]
+ */
 fun groupByMonth(countryHolidays: List<HolidayResponse>): List<Month> {
     var i: Long
     val list: MutableList<Month> = mutableListOf()
@@ -153,6 +161,11 @@ fun groupByMonth(countryHolidays: List<HolidayResponse>): List<Month> {
     return list
 }
 
+/**
+ * We are calculating the maximum number of free days
+ * @param [List<HolidayResponse>)]
+ * @return [MutableList<Int>]
+ */
 fun calculateMaxDays(holidays: List<HolidayResponse>): MutableList<Int> {
     var maxHolidays = 2
     val maxNum = mutableListOf<Int>()
