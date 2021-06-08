@@ -1,1 +1,1 @@
-web: java -jar build/libs/*.jar
+web: java -jar build/libs/ehtesham-0.0.1.jar
