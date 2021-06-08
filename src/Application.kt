@@ -31,12 +31,12 @@ fun Application.module(testing: Boolean = false) {
         gson()
     }
 
-    /*"jdbc:h2:mem:test;DB_CLOSE_DELAY=-1", driver = "org.h2.Driver"*/
-    Database.connect(
-        url = "jdbc:mysql://127.0.0.1:3306/sys?autoReconnect=true&useSSL=false",
-        driver = "com.mysql.cj.jdbc.Driver",
-        user = "root",
-        password = "password"
+    Database.connect(    "jdbc:h2:mem:test;DB_CLOSE_DELAY=-1", driver = "org.h2.Driver"
+
+//        url = "jdbc:mysql://127.0.0.1:3306/sys?autoReconnect=true&useSSL=false",
+//        driver = "com.mysql.cj.jdbc.Driver",
+//        user = "root",
+//        password = "password"
     )
     transaction {
         SchemaUtils.create(Countries)

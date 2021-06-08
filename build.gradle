@@ -50,6 +50,12 @@ dependencies {
     implementation "com.viartemev:ktor-flyway-feature:1.2.2"
     implementation "com.h2database:h2:$h2Version"
     implementation "com.zaxxer:HikariCP:$hikariCpVersion"
+}
 
-
+task fatJar(type: Jar) {
+    manifest {
+        attributes 'Main-Class': mainClassName
+    }
+    from { configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) } }
+    with jar
 }

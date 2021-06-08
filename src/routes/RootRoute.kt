@@ -20,6 +20,7 @@ import org.jetbrains.exposed.sql.transactions.transaction
 fun Routing.root() {
 
     get("/") {
+        call.respond("Welcome")
     }
 
     get("/holidays/{code}/{year}") {
